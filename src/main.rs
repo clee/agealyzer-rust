@@ -1,6 +1,7 @@
 #![feature(fs_walk)]
 #![feature(path_ext)]
 #![feature(metadata_ext)]
+#![feature(dir_entry_ext)]
 #![feature(slice_patterns)]
 #![feature(libc)]
 
@@ -15,50 +16,41 @@ use std::collections::BTreeMap;
 use std::os::unix::fs::MetadataExt;
 use std::iter::repeat;
 use time::*;
+use std::io;
+
+fn walk(directory: &Path, years: &mut BTreeMap<i32, u64>) -> io::Result<()> {
+    for entry in try!(walk_dir(&directory)) {
+        let dir = try!(entry);
+        let meta = try!(dir.metadata());
+
+        if !meta.is_file() {
+            continue;
+        }
+        let mtime = meta.as_raw().mtime();
+        let mtime_nsec = meta.as_raw().mtime_nsec();
+        let utc = at_utc(Timespec::new(mtime, mtime_nsec as i32));
+        let year = 1900 + utc.tm_year;
+
+        *years.entry(year).or_insert(0) += 1;
+    }
+    Ok(())
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut years: BTreeMap<i32, u64> = BTreeMap::new();
-    let mut directory;
 
-    match &args[..] {
-        [ref name] => {
-            panic!("usage: {} </path/to/directory>", name);
-        },
+    let directory = match &args[..] {
         [_, ref path] => {
-            directory = Path::new(path);
+            Path::new(path)
         },
         _ => {
-            panic!("usage: agealyzer </path/to/directory>");
+            panic!("usage: agealyzer </path/to/directory>")
         }
-    }
+    };
 
-    for entry in walk_dir(&directory).unwrap() {
-        match entry {
-            Ok(dir) => {
-                if !dir.path().as_path().is_file() {
-                    continue;
-                }
-                // let stat = dir.path().as_path().metadata().unwrap().as_raw();
-                // let mtime = stat.mtime();
-                // let mtime_nsec = stat.mtime_nsec();
-                let mtime = dir.path().as_path().metadata().unwrap().as_raw().mtime();
-                let mtime_nsec = dir.path().as_path().metadata().unwrap().as_raw().mtime_nsec();
-                let utc = at_utc(Timespec::new(mtime, mtime_nsec as i32));
-
-                /* WTF, RUST? Why are your years off by 1900? */
-                let year = 1900 + utc.tm_year;
-
-                if !years.contains_key(&year) {
-                    years.insert(year, 1);
-                } else {
-                    if let Some(x) = years.get_mut(&year) {
-                        *x = *x + 1;
-                    }
-                }
-            },
-            Err(e) => println!("Shit! {:?}", e),
-        }
+    if let Err(_) = walk(&directory, &mut years) {
+      panic!("failure walking");
     }
 
     let zero = 0u64;
