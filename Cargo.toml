@@ -5,3 +5,5 @@ authors = ["Chris Lee <clee@mg8.org>"]
 
 [dependencies]
 time = "0.1"
+walkdir = "0.1"
+libc = "0.2"

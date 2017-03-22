@@ -1,15 +1,8 @@
-#![feature(fs_walk)]
-#![feature(path_ext)]
-#![feature(metadata_ext)]
-#![feature(dir_entry_ext)]
-#![feature(slice_patterns)]
-#![feature(libc)]
-
 extern crate libc;
 extern crate time;
+extern crate walkdir;
 
-use std::fs::walk_dir;
-use std::fs::PathExt;
+use walkdir::WalkDir;
 use std::path::Path;
 use std::env;
 use std::collections::BTreeMap;
@@ -19,17 +12,14 @@ use time::*;
 use std::io;
 
 fn walk(directory: &Path, years: &mut BTreeMap<i32, u64>) -> io::Result<()> {
-    for entry in try!(walk_dir(&directory)) {
-        let dir = try!(entry);
-        let meta = try!(dir.metadata());
+    for entry in WalkDir::new(&directory) {
+        let meta = entry?.path().metadata()?;
 
         if !meta.is_file() {
             continue;
         }
-        let mtime = meta.as_raw().mtime();
-        let mtime_nsec = meta.as_raw().mtime_nsec();
-        let utc = at_utc(Timespec::new(mtime, mtime_nsec as i32));
-        let year = 1900 + utc.tm_year;
+
+        let year = 1900 + at_utc(Timespec::new(meta.mtime(), meta.mtime_nsec() as i32)).tm_year;
 
         *years.entry(year).or_insert(0) += 1;
     }
@@ -40,9 +30,9 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut years: BTreeMap<i32, u64> = BTreeMap::new();
 
-    let directory = match &args[..] {
-        [_, ref path] => {
-            Path::new(path)
+    let directory = match args.len() {
+        2 => {
+            Path::new(&args[1])
         },
         _ => {
             panic!("usage: agealyzer </path/to/directory>")
@@ -56,7 +46,7 @@ fn main() {
     let zero = 0u64;
     let max_hits = match years.values().max() {
         Some(m) => m,
-        None => &zero, 
+        None => &zero,
     };
     for y in years.keys() {
         let hits = match years.get(&y) {
