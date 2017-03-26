@@ -4,6 +4,5 @@ version = "0.1.0"
 authors = ["Chris Lee <clee@mg8.org>"]
 
 [dependencies]
-time = "0.1"
+chrono = "0.3"
 walkdir = "0.1"
-libc = "0.2"
