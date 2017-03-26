@@ -3,16 +3,16 @@ extern crate walkdir;
 
 use std::io;
 use std::env;
-use std::error::Error;
-use std::collections::BTreeMap;
-use std::iter::repeat;
-use std::time::UNIX_EPOCH;
 use std::path::Path;
+use std::collections::BTreeMap;
+use std::time::UNIX_EPOCH;
+use std::iter::repeat;
 
-use chrono::{NaiveDateTime, Datelike};
+use chrono::{NaiveDateTime::from_timestamp, Datelike};
 use walkdir::WalkDir;
 
-fn walk(directory: &Path, years: &mut BTreeMap<i32, u64>) -> io::Result<()> {
+fn walk(directory: &Path) -> io::Result<BTreeMap<i32, u64>> {
+    let mut years: BTreeMap<i32, u64> = BTreeMap::new();
     for entry in WalkDir::new(&directory) {
         let meta = entry?
             .path()
@@ -23,25 +23,22 @@ fn walk(directory: &Path, years: &mut BTreeMap<i32, u64>) -> io::Result<()> {
         }
 
         if let Ok(seconds) = meta.modified()?.duration_since(UNIX_EPOCH) {
-            let year = NaiveDateTime::from_timestamp(seconds.as_secs() as i64, 0).date().year();
+            let year = from_timestamp(seconds.as_secs() as i64, 0).date().year();
             *years.entry(year).or_insert(0) += 1;
         }
     }
-    Ok(())
+    Ok(years);
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut years: BTreeMap<i32, u64> = BTreeMap::new();
 
     let directory = match args.len() {
         2 => Path::new(&args[1]),
         _ => panic!("usage: agealyzer </path/to/directory>"),
     };
 
-    if let Err(e) = walk(&directory, &mut years) {
-        panic!("failure walking: {}", e.description());
-    }
+    let years = walk(&directory).expect("at least an empty collection");
 
     let max_hits = years.values().max().expect("should be at least one int");
     for y in years.keys() {
