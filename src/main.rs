@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::time::UNIX_EPOCH;
 use std::iter::repeat;
 
-use chrono::{NaiveDateTime::from_timestamp, Datelike};
+use chrono::{UTC, TimeZone, Datelike};
 use walkdir::WalkDir;
 
 fn walk(directory: &Path) -> io::Result<BTreeMap<i32, u64>> {
@@ -23,11 +23,11 @@ fn walk(directory: &Path) -> io::Result<BTreeMap<i32, u64>> {
         }
 
         if let Ok(seconds) = meta.modified()?.duration_since(UNIX_EPOCH) {
-            let year = from_timestamp(seconds.as_secs() as i64, 0).date().year();
+            let year = UTC.timestamp(seconds.as_secs() as i64, 0).date().year();
             *years.entry(year).or_insert(0) += 1;
         }
     }
-    Ok(years);
+    Ok(years)
 }
 
 fn main() {
